@@ -2,11 +2,19 @@
 #include <iostream>
 #include <algorithm>
 #include <omp.h>
+#include <cstring>
+#include <cstdlib>
+#include <string>
+#include <fstream>
 
 using std::cerr;
 using std::cout;
 using std::endl;
 using std::pair;
+using std::string;
+using std::ifstream;
+using std::getline;
+
 const double eps_b = 3e-2;
 const double eps_ab = 3e-4; // -2
 const double eps_a = 3e-2;
@@ -16,69 +24,247 @@ double ParticleSystem::euclideanNorm(Vector3d r)
     return sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
 }
 
-
-ParticleSystem::ParticleSystem(int _xNumber, int _yNumber, int _zNumber)
-{
-    OMP_ON = 0;
-    seed = -1;
+ParticleSystem::ParticleSystem(string & filename){
     threads = 1;
     isBulk = 1;
-    if (SKIP_FITTING_B){
-        A0[0] = 0.12051;
-        A1[0] = 0.0320955;
-        ksi[0] = 1.21461;
-        p[0] = 10.6915;
-        q[0] = 2.94819;
-        r0[0] = 2.8704;
-        latticeConstant = 4.05936;
-        cohEnergy = -2.90166;
+    xNumber = 3; yNumber = 3; zNumber = 3;
+    printErrorFlag = printConfigurationFlag = 0;
+    string thr_str = "Number of threads: ";
+    string seed_str = "Seed: ";
+    string nameAtom_str = "Name of atom: ";
+    string latticeConstant_str = "latticeConstant: ";
+    string cohEnergy_str = "cohesive energy: ";
+    string b_str = "B: ";
+    string c11_str = "C11: ";
+    string c12_str = "C12: ";
+    string c44_str = "C44: ";
+    string namePurityAtom_str = "Name of impurity atom: ";
+    string eSol_str = "e_sol: ";
+    string energyIn_str = "e_in_dim: ";
+    string energyOn_str = "e_on_dim: ";
+    string x_str = "count of cells(x): ";
+    string y_str = "count of cells(y): ";
+    string z_str = "count of cells(z): ";
+    string printError_str = "Print error: ";
+    string printConfiguration_str = "Print configuration: ";
+    string cohEnergyPurityAtom_str = "cohesive energy of purity atom: ";
+    ifstream inFile(filename.c_str());
+    while(inFile){
+        string line;
+        getline(inFile, line);
+        if (line[0] == '#') continue;
+        if (line.compare(0, seed_str.size(), seed_str) == 0){
+            seed = atoi(line.c_str() + seed_str.size());
+        }
+        else if (line.compare(0, thr_str.size(), thr_str) == 0){
+            threads = atoi(line.c_str() + thr_str.size());
+        }
+        else if (line.compare(0, nameAtom_str.size(), nameAtom_str) == 0){
+            nameAtom = line.substr(nameAtom_str.size(), line.size() - nameAtom_str.size());
+        }
+        else if (line.compare(0, namePurityAtom_str.size(), namePurityAtom_str) == 0){
+            namePurityAtom = line.substr(namePurityAtom_str.size(), line.size() - namePurityAtom_str.size());
+        }
+        else if (line.compare(0, latticeConstant_str.size(), latticeConstant_str) == 0){
+            tableLatticeConstant = atof(line.c_str() + latticeConstant_str.size());
+        }
+        else if (line.compare(0, cohEnergy_str.size(), cohEnergy_str) == 0){
+            tableCohesiveEnergy = atof(line.c_str() + cohEnergy_str.size());
+        }
+        else if (line.compare(0, b_str.size(), b_str) == 0){
+            tableB = atof(line.c_str() + b_str.size());
+        }
+        else if (line.compare(0, c11_str.size(), c11_str) == 0){
+            tableC11 = atof(line.c_str() + c11_str.size());
+        }
+        else if (line.compare(0, c12_str.size(), c12_str) == 0){
+            tableC12 = atof(line.c_str() + c12_str.size());
+        }
+        else if (line.compare(0, c44_str.size(), c44_str) == 0){
+            tableC44 = atof(line.c_str() + c44_str.size());
+        }
+        else if (line.compare(0, eSol_str.size(), eSol_str) == 0){
+            tableEsol = atof(line.c_str() + eSol_str.size());
+        }
+        else if (line.compare(0, energyIn_str.size(), energyIn_str) == 0){
+            tableEin = atof(line.c_str() + energyIn_str.size());
+        }
+        else if (line.compare(0, energyOn_str.size(), energyOn_str) == 0){
+            tableEon = atof(line.c_str() + energyOn_str.size());
+        }
+        else if (line.compare(0, cohEnergyPurityAtom_str.size(), cohEnergyPurityAtom_str) == 0){
+            cohEnergyPurityAtom = atof(line.c_str() + cohEnergyPurityAtom_str.size());
+        }
+        else if (line.compare(0, x_str.size(), x_str) == 0){
+            xNumber = atoi(line.c_str() + x_str.size());
+        }
+        else if (line.compare(0, y_str.size(), y_str) == 0){
+            yNumber = atoi(line.c_str() + y_str.size());
+        }
+        else if (line.compare(0, z_str.size(), z_str) == 0){
+            zNumber = atoi(line.c_str() + z_str.size());
+        }
+        else if (line.compare(0, printError_str.size(), printError_str) == 0){
+            printErrorFlag = atoi(line.c_str() + printError_str.size());
+        }
+        else if (line.compare(0, printConfiguration_str.size(), printConfiguration_str) == 0){
+            printConfigurationFlag = atoi(line.c_str() + printConfiguration_str.size());
+        }
+
+
+        else if (line.size() >= 3 && (line.compare(3, 5, "B-B: ") == 0 ||
+                                      line.compare(2, 5, "B-B: ") == 0 ||
+                                      line.compare(4, 5, "B-B: ") == 0)){
+            if (line.compare(0, 3, "A0 ") == 0){
+                char * end;
+                bb_a0[0] = strtod(line.c_str() + 8, &end);
+                bb_a0[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 3, "A1 ") == 0){
+                char * end;
+                bb_a1[0] = strtod(line.c_str() + 8, &end);
+                bb_a1[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 4, "ksi ") == 0){
+                char * end;
+                bb_ksi[0] = strtod(line.c_str() + 9, &end);
+                bb_ksi[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 2, "p ") == 0){
+                char * end;
+                bb_p[0] = strtod(line.c_str() + 7, &end);
+                bb_p[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 2, "q ") == 0){
+                char * end;
+                bb_q[0] = strtod(line.c_str() + 7, &end);
+                bb_q[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 3, "r0 ") == 0){
+                char * end;
+                bb_r0[0] = strtod(line.c_str() + 8, &end);
+                bb_r0[1] = strtod(end, NULL);
+            }
+        }
+        else if (line.size() >= 3 && (line.compare(3, 5, "A-B: ") == 0 ||
+                                      line.compare(2, 5, "A-B: ") == 0 ||
+                                      line.compare(4, 5, "A-B: ") == 0)){
+            if (line.compare(0, 3, "A0 ") == 0){
+                char * end;
+                ab_a0[0] = strtod(line.c_str() + 8, &end);
+                ab_a0[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 3, "A1 ") == 0){
+                char * end;
+                ab_a1[0] = strtod(line.c_str() + 8, &end);
+                ab_a1[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 4, "ksi ") == 0){
+                char * end;
+                ab_ksi[0] = strtod(line.c_str() + 9, &end);
+                ab_ksi[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 2, "p ") == 0){
+                char * end;
+                ab_p[0] = strtod(line.c_str() + 7, &end);
+                ab_p[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 2, "q ") == 0){
+                char * end;
+                ab_q[0] = strtod(line.c_str() + 7, &end);
+                ab_q[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 3, "r0 ") == 0){
+                char * end;
+                ab_r0[0] = strtod(line.c_str() + 8, &end);
+                ab_r0[1] = strtod(end, NULL);
+            }
+        }
+        else if (line.size() >= 3 && (line.compare(3, 5, "A-A: ") == 0 ||
+                                      line.compare(2, 5, "A-A: ") == 0 ||
+                                      line.compare(4, 5, "A-A: ") == 0)){
+            if (line.compare(0, 3, "A0 ") == 0){
+                char * end;
+                aa_a0[0] = strtod(line.c_str() + 8, &end);
+                aa_a0[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 3, "A1 ") == 0){
+                char * end;
+                aa_a1[0] = strtod(line.c_str() + 8, &end);
+                aa_a1[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 4, "ksi ") == 0){
+                char * end;
+                aa_ksi[0] = strtod(line.c_str() + 9, &end);
+                aa_ksi[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 2, "p ") == 0){
+                char * end;
+                aa_p[0] = strtod(line.c_str() + 7, &end);
+                aa_p[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 2, "q ") == 0){
+                char * end;
+                aa_q[0] = strtod(line.c_str() + 7, &end);
+                aa_q[1] = strtod(end, NULL);
+            }
+            else if (line.compare(0, 3, "r0 ") == 0){
+                char * end;
+                aa_r0[0] = strtod(line.c_str() + 8, &end);
+                aa_r0[1] = strtod(end, NULL);
+            }
+        }
+
     }
-    if (SKIP_FITTING_AB){
-        A0[1] = 0.0773566;
-        A1[1] = -0.00913184;
-        ksi[1] = 0.851237;
-        p[1] = 15.574;
-        q[1] = 2.41335;
-        r0[1] = 2.88853;
-        Esol = -0.578009;
+    OMP_ON = threads > 1;
+    if (seed == -1){
+        seed = time(NULL);
     }
-    xNumber = _xNumber; yNumber = _yNumber; zNumber = _zNumber;
-    if (isBulk){
-        for (int itX = 0; itX < xNumber; ++itX){
-            for (int itY = 0; itY < yNumber; ++itY){
-                for (int itZ = 0; itZ < zNumber;  ++itZ){
-                    Particle tmpParticle0(itX, itY, itZ, 0);
-                    particles.push_back(tmpParticle0);
-                    //if (itX == xNumber || itY == yNumber || itZ == zNumber) continue;
-                    Particle tmpParticle1(itX + 0.5, itY + 0.5, itZ, 0);
-                    Particle tmpParticle2(itX + 0.5, itY, itZ + 0.5, 0);
-                    Particle tmpParticle3(itX, itY + 0.5, itZ + 0.5, 0);
-                    particles.push_back(tmpParticle1);
-                    particles.push_back(tmpParticle2);
-                    particles.push_back(tmpParticle3);
-                }
+    srand(seed);
+    for (int itX = 0; itX < xNumber; ++itX){
+        for (int itY = 0; itY < yNumber; ++itY){
+            for (int itZ = 0; itZ < zNumber;  ++itZ){
+                Particle tmpParticle0(itX, itY, itZ, 0);
+                particles.push_back(tmpParticle0);
+                Particle tmpParticle1(itX + 0.5, itY + 0.5, itZ, 0);
+                Particle tmpParticle2(itX + 0.5, itY, itZ + 0.5, 0);
+                Particle tmpParticle3(itX, itY + 0.5, itZ + 0.5, 0);
+                particles.push_back(tmpParticle1);
+                particles.push_back(tmpParticle2);
+                particles.push_back(tmpParticle3);
             }
         }
     }
-    else{
-        for (int itX = 0; itX <= xNumber; ++itX){
-            for (int itY = 0; itY <= yNumber; ++itY){
-                for (int itZ = 0; itZ <= zNumber;  ++itZ){
-                    Particle tmpParticle0(itX, itY, itZ, 0);
-                    particles.push_back(tmpParticle0);
-                    if (itX == xNumber || itY == yNumber || itZ == zNumber) continue;
-                    Particle tmpParticle1(itX + 0.5, itY + 0.5, itZ, 0);
-                    Particle tmpParticle2(itX + 0.5, itY, itZ + 0.5, 0);
-                    Particle tmpParticle3(itX, itY + 0.5, itZ + 0.5, 0);
-                    particles.push_back(tmpParticle1);
-                    particles.push_back(tmpParticle2);
-                    particles.push_back(tmpParticle3);
-                }
-            }
-        }
-    }
-    cerr << "number of particles: " << particles.size() << endl;
+    if (printConfigurationFlag) printConfiguration();
 }
+
+void ParticleSystem::printConfiguration()
+{
+    cout << "Configuration of program system:\n______________________________________________________\n";
+    cout << "number of particles: " << particles.size() << endl;
+    cout << "Number of threads: " << threads << "\n";
+    cout << "Seed: " << seed << "\n";
+    cout << "Print error: " << printErrorFlag << "\n";
+    cout << "Print configuration: " << printConfigurationFlag << "\n";
+    cout << "count of cells(x): " << xNumber << "\n";
+    cout << "count of cells(y): " << yNumber << "\n";
+    cout << "count of cells(z): " << zNumber << "\n";
+    cout << "Name of atom: " << nameAtom << "\n";
+    cout << "latticeConstant: " << tableLatticeConstant << "\n";
+    cout << "cohesive energy: " << tableCohesiveEnergy << "\n";
+    cout << "B: " << tableB << "\n";
+    cout << "C11: " << tableC11 << "\n";
+    cout << "C12: " << tableC12 << "\n";
+    cout << "c44: " << tableC44 << "\n";
+    cout << "Name of purity atom: " << namePurityAtom << "\n";
+    cout << "cohesive energy of purity atom: " << cohEnergyPurityAtom << "\n";
+    cout << "e_sol: " << tableEsol << "\n";
+    cout << "e_in_dim: " << tableEin << "\n";
+    cout << "e_on_dim: " << tableEon << "\n";
+
+
+}
+
 
 
 double ParticleSystem::cohesiveEnergy_omp(int typeTransform, double alpha)
@@ -126,13 +312,10 @@ double ParticleSystem::cohesiveEnergy_omp(int typeTransform, double alpha)
         }
         bandEnergy[thr] = -sqrt(bandEnergy[thr]);
         tmpEnergy[thr] += repulsiveEnergy[thr] + bandEnergy[thr];
-       // cerr << repulsiveEnergy << "\t" << bandEnergy << "\n";
     }
     for (int i = 0; i < threads; ++i){
         energy += tmpEnergy[i];
     }
-   // cerr << "total energy = " << energy << endl;
-   // cohEnergy =  energy / particles.size();
     return energy / particles.size();
 }
 
@@ -140,15 +323,11 @@ double ParticleSystem::cohesiveEnergy_omp(int typeTransform, double alpha)
 
 double ParticleSystem::cohesiveEnergy(int typeTransform, double alpha)
 {
-    //set_r0(alpha);
-    //set_cutoff(alpha);
     cutoff = 1.7 * latticeConstant;
     double energy = 0.0;
     double repulsiveEnergy = 0.0;
     double bandEnergy = 0.0;
-
     for (int i = 0; i < particles.size(); ++i){
-       // cerr << "i = " << i << "\n";
         repulsiveEnergy = bandEnergy = 0.0;
         Vector3d pos_i = particles[i].getPosition(latticeConstant, typeTransform, alpha);
         for (int j = 0; j < particles.size(); ++j){
@@ -180,12 +359,9 @@ double ParticleSystem::cohesiveEnergy(int typeTransform, double alpha)
                 }
             }
         }
-
         bandEnergy = -sqrt(bandEnergy);
         energy += repulsiveEnergy + bandEnergy;
     }
-   // cerr << "total energy = " << energy << endl;
-   // cohEnergy =  energy / particles.size();
     return energy / particles.size();
 }
 
@@ -201,25 +377,12 @@ double ParticleSystem::distance(Vector3d i, Vector3d j)
     return euclideanNorm(i - j);
 }
 
-bool ParticleSystem::get_out(Vector3d & a)
-{
-    return !((a.x >= 0 && a.x < xNumber * latticeConstant) &&
-           (a.y >= 0 && a.y < yNumber * latticeConstant) &&
-             (a.z >= 0 && a.z < zNumber * latticeConstant));
-}
-
-bool ParticleSystem::between(double x, double l, double r)
-{
-    return x >= l && x < r;
-}
-
 int comp(pair<double, int> a, pair<double, int> b){
     return a.first < b.first;
 }
 
 double ParticleSystem::NMA(double (ParticleSystem::*error)(), int _type, double alpha, double beta, double gamma)
 {
-    //cerr << "NMA start " << PRINT_FLAG << "\n";
     const int DIM = 6;
     vector<vector<double> > simplex(DIM + 1, vector<double> (DIM));
     vector<pair<double, int>> f(DIM + 1);
@@ -246,23 +409,20 @@ double ParticleSystem::NMA(double (ParticleSystem::*error)(), int _type, double 
     int cntSteps = 0;
     while (true){
         if(err < eps){
-            cerr << "error: " << err << "\n";
-            cerr << "OPTIMIZED\n";
+            cout << "error: " << err << "\n";
+            cout << "OPTIMIZED\n";
             print_params(_type);
             break;
         }
         for (int i = 0; i < DIM + 1; ++i){
             generate_params(_type, simplex[i]);
-            //print_params(simplex[i]);
             cntSteps = 0;
-            //cntIt++;
         }
         while (true){
             cntSteps++;
             if (cntSteps > 1000){
                 break;
             }
-           // cerr << "while start\n";
             for (int i = 0; i < DIM + 1; ++i){
                 load_params(_type, simplex[i]);
                 f[i].first = (this->*error)();
@@ -285,21 +445,10 @@ double ParticleSystem::NMA(double (ParticleSystem::*error)(), int _type, double 
                 x_c[dim] = x_c[dim] / (double)DIM;
             }
             globalError = (globalError < f_l ? globalError : f_l);
-           // cerr << "FLAG " << PRINT_FLAG <<  _type << "\n";
             // step 9
-            if (PRINT_FLAG){
+            if (printErrorFlag){
             	cout << cntIt++ << " " << globalError << "\n";
-               /* if (_type == 0) cerr << "error: " << f_l << "\n";
-                if (_type == 1) cerr << "error: " << f_l << "\t " << Esol << "\n";
-                if (_type == 2){
-                    //if (f_l < 5e-3) {
-                        cerr << "error: " << f_l << "\t " << energyIn << "\t" << energyOn << "\n";
-                        //print_params(_type);
-                    //}
-                }*/
-
             }
-            // print_params(params[x_l]);
             if (f_l < eps || stop_rule(simplex, x_c)){
                 load_params(_type, x_c);
                 f_c = (this->*error)();
@@ -368,21 +517,20 @@ double ParticleSystem::NMA(double (ParticleSystem::*error)(), int _type, double 
             }
         }
     }
-
-    cout << "\n\n";
 }
 
 void ParticleSystem::load_params(int type, vector<double> & params)
 {
     A0[type] = params[0];
     A1[type] = params[1];
-    ksi[type] = params[2];
-    p[type] = params[3];
-    q[type] = params[4];
-    r0[type] = params[5];
+    ksi[type] = fabs(params[2]);
+    p[type] = fabs(params[3]);
+    q[type] = fabs(params[4]);
+    r0[type] = fabs(params[5]);
     if (type == 0) {
         latticeConstant = r0[type] * sqrt(2);
     }
+    setV0();
 }
 
 double ParticleSystem::error_b()
@@ -391,24 +539,18 @@ double ParticleSystem::error_b()
     setB();
     setC11_C12();
     setC44();
-   /* return ((-2.96 - cohEnergy) / -2.96) * ((-2.96 - cohEnergy) / -2.96) +
-            ((4.085 - latticeConstant) / 4.085) * ((4.085 - latticeConstant) / 4.085)
-            + ((1.08 - B) / 1.08) * ((1.08 - B) / 1.08)
-            + ((1.32 - C11) / 1.32) * ((1.32 - C11) / 1.32)
-            + ((0.97 - C12) / 0.97) * ((0.97 - C12) / 0.97)
-            + ((0.51 - C44) / 0.51) * ((0.51 - C44) / 0.51);*/
-    return sqrt((((-2.96 - cohEnergy)) * ((-2.96 - cohEnergy))/pow(-2.96, 2) +
-                ((4.085 - latticeConstant) ) * ((4.085 - latticeConstant))/pow(4.085, 2)
-                + ((1.08 - B)) * ((1.08 - B))/pow(1.08, 2)
-                + ((1.32 - C11)) * ((1.32 - C11))/pow(1.32, 2)
-                + ((0.97 - C12)) * ((0.97 - C12))/pow(0.97, 2)
-            + ((0.51 - C44)) * ((0.51 - C44))/pow(0.51, 2))/6.0);
+    return sqrt((pow((tableCohesiveEnergy - cohEnergy) / tableCohesiveEnergy, 2) +
+                pow((tableLatticeConstant - latticeConstant) / tableLatticeConstant, 2)
+                + pow((tableB - B) / tableB, 2)
+                + pow((tableC11 - C11) / tableC11, 2)
+                + pow((tableC12 - C12) / tableC12, 2)
+                + pow((tableC44 - C44) / tableC44, 2)) / 6.0);
 }
 
 double ParticleSystem::error_ab()
 {
     setEsol();
-    double err = sqrt((0.539 - Esol) * (0.539 - Esol)/pow(0.539, 2));
+    double err = sqrt(pow((tableEsol - Esol) / tableEsol, 2));
     return err;
 }
 
@@ -416,73 +558,36 @@ double ParticleSystem::error_a()
 {
     setEnergyIn();
     setEnergyOn();
-    double err = sqrt(((0.06 - energyIn) * (0.06 - energyIn)/pow(0.06, 2) +
-             (-0.56 - energyOn) * (-0.56 - energyOn)/pow(-0.56, 2))/2.0);
+    double err = sqrt((pow((tableEin - energyIn) / tableEin, 2) +
+             pow((tableEon - energyOn) / tableEon, 2)) / 2.0);
     return err;
 }
 
-/*
-double ParticleSystem::getEnergyIn()
-{
-    double res = 0;
-    isBulk = 0;
-    double energy_surf = cohesiveEnergy() * particles.size();
-    particles[94].setType(1);
-    double energy_adatom_surf = cohesiveEnergy() * particles.size();
-    particles[95].setType(1);
-    double energy_dimer_surf = cohesiveEnergy() * particles.size();
-    res = (energy_dimer_surf - energy_surf) - 2 * (energy_adatom_surf - energy_surf);
-    particles[94].setType(0);
-    particles[95].setType(0);
-    isBulk = 1;
-    energyIn = res;
-    return res;
-}
-
-double ParticleSystem::getEnergyOn()
-{
-    double res = 0;
-    isBulk = 0;
-    double energy_surf = cohesiveEnergy() * particles.size();
-    Particle tmp0(0.0, 0.0, 3.0, 1);
-    Particle tmp1(0.5, 0.5, 3.0, 1);
-    particles.push_back(tmp0);
-    double energy_adatom_surf = cohesiveEnergy() * particles.size();
-    particles.push_back(tmp1);
-    double energy_dimer_surf = cohesiveEnergy() * particles.size();
-    particles.pop_back();
-    particles.pop_back();
-    res = (energy_dimer_surf - energy_surf) - 2 * (energy_adatom_surf - energy_surf);
-    isBulk = 1;
-    energyOn = res;
-    return res;
-}
-*/
 
 
 void ParticleSystem::setEnergyIn()
 {
+    int first = -1;
+    int second = -1;
+    for (int i = 0; i < particles.size(); ++i){
+        Vector3d pos = particles[i].getPositionLC();
+        if (pos.z == zNumber - 0.5 && pos.x == 0.5 && pos.y == 0){
+            first = i;
+        }
+        if (pos.z == zNumber - 0.5 && pos.x == 0 && pos.y == 0.5){
+            second = i;
+        }
+    }
     double res = 0;
-//    double energy_bulk = cohesiveEnergy() * particles.size();
-//    particles[94].setType(1);
-//    double energy_bulk_adatom = cohesiveEnergy() * particles.size();
-//    particles[95].setType(1);
-//    double energy_bulk_dimer = cohesiveEnergy() * particles.size();
-//    particles[94].setType(0);
-//    particles[95].setType(0)
-
     isBulk = 0;
     double energy_surf = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy()) * particles.size();
-    //double energy_surf = (energy_bulk - cohesiveEnergy() * particles.size()) / (18.0 * latticeConstant * latticeConstant);
-    particles[94].setType(1);
+    particles[first].setType(1);
     double energy_adatom_surf = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy()) * particles.size();
-    //double energy_adatom_surf = (energy_bulk_adatom - cohesiveEnergy() * particles.size()) / (18.0 * latticeConstant * latticeConstant);
-    particles[95].setType(1);
+    particles[second].setType(1);
     double energy_dimer_surf = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy()) * particles.size();
-    //double energy_dimer_surf = (energy_bulk_dimer - cohesiveEnergy() * particles.size()) / (18.0 * latticeConstant * latticeConstant);
     res = (energy_dimer_surf - energy_surf) - 2 * (energy_adatom_surf - energy_surf);
-    particles[94].setType(0);
-    particles[95].setType(0);
+    particles[first].setType(0);
+    particles[second].setType(0);
     isBulk = 1;
     energyIn = res;
 }
@@ -490,30 +595,14 @@ void ParticleSystem::setEnergyIn()
 void ParticleSystem::setEnergyOn()
 {
     double res = 0;
-    Particle tmp0(0.0, 0.0, 3.0, 1);
-    Particle tmp1(0.5, 0.5, 3.0, 1);
-//    double energy_bulk = cohesiveEnergy() * particles.size();
-//    particles.push_back(tmp0);
-//    double energy_bulk_adatom = cohesiveEnergy() * particles.size();
-//    particles.push_back(tmp1);
-//    double energy_bulk_dimer = cohesiveEnergy() * particles.size();
-//    particles.pop_back();
-//    particles.pop_back();
-
+    Particle tmp0(0.0, 0.0, zNumber, 1);
+    Particle tmp1(0.5, 0.5, zNumber, 1);
     isBulk = 0;
     double energy_surf = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy()) * particles.size();
-    //double energy_surf = (energy_bulk - cohesiveEnergy() * particles.size()) / (18.0 * latticeConstant * latticeConstant);
     particles.push_back(tmp0);
     double energy_adatom_surf = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy()) * particles.size();
-    //double energy_adatom_surf = (energy_bulk_adatom - cohesiveEnergy() * particles.size()) / (18.0 * latticeConstant * latticeConstant);
     particles.push_back(tmp1);
-//    cout << particles.size() << "\n\n";
-//    for (int i = 0; i < particles.size(); ++i){
-//        Vector3d pos = particles[i].getPosition(4.085, 0, 0);
-//        cout << particles[i].getType() << " " << pos.x << " " << pos.y << " " << pos.z << "\n";
-//    }
     double energy_dimer_surf = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy()) * particles.size();
-    //double energy_dimer_surf = (energy_bulk_dimer - cohesiveEnergy() * particles.size()) / (18.0 * latticeConstant * latticeConstant);
     particles.pop_back();
     particles.pop_back();
     res = (energy_dimer_surf - energy_surf) - 2 * (energy_adatom_surf - energy_surf);
@@ -531,9 +620,10 @@ void ParticleSystem::print_params(vector<double> & params)
 
 void ParticleSystem::print_params(int type)
 {
-    //set_r0(type, 0);
-    cerr << "A0 = " << A0[type] << "\nA1 = " << A1[type] << "\nksi = " << ksi[type] <<
+    cout << "A0 = " << A0[type] << "\nA1 = " << A1[type] << "\nksi = " << ksi[type] <<
             "\np = " << p[type] << "\nq = " << q[type] << "\nr0 = " << r0[type] << "\n";
+   // cout << A0[type] << ", " << A1[type] << ", " << p[type] << ", " << q[type] << ", " <<
+     //       ksi[type] << ", " << r0[type] << "\n";
 }
 
 void ParticleSystem::setV0()
@@ -544,7 +634,7 @@ void ParticleSystem::setV0()
 void ParticleSystem::printV0()
 {
     setV0();
-    cerr << "V0 = " << V0 << endl;
+    cout << "V0 = " << V0 << endl;
 }
 
 void ParticleSystem::setC11_C12()
@@ -555,7 +645,6 @@ void ParticleSystem::setC11_C12()
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(11, 0.0): cohesiveEnergy()) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(11, -0.01): cohesiveEnergy(11, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(11, 0.01): cohesiveEnergy(11, 0.01)) * particles.size();
-   // cerr << energy_i0 << "\t" << energy_i1 << "\t" << energy_i2 << endl;
     C11 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
     C12 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
     }
@@ -563,7 +652,6 @@ void ParticleSystem::setC11_C12()
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(12, 0.0): cohesiveEnergy(12, 0.0)) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(12, -0.01): cohesiveEnergy(12, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(12, 0.01): cohesiveEnergy(12, 0.01)) * particles.size();
-   // cerr << energy_i0 << "\t" << energy_i1 << "\t" << energy_i2 << endl;
     C11 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
     C12 -= 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
     }
@@ -574,33 +662,27 @@ void ParticleSystem::setC11_C12()
 void ParticleSystem::printC11_C12()
 {
     setC11_C12();
-    cerr << "C11 = " << C11 << endl;
-    cerr << "C12 = " << C12 << endl;
+    cout << "C11 = " << C11 << endl;
+    cout << "C12 = " << C12 << endl;
 }
 
 
-void ParticleSystem::setC44()
-{
-   // latticeConstant = 4.085;
+void ParticleSystem::setC44(){
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(44, 0.0): cohesiveEnergy(44, 0.0)) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(44, -0.01): cohesiveEnergy(44, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(44, 0.01): cohesiveEnergy(44, 0.01)) * particles.size();
     C44 = 1.0 / (2.0 * V0) * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
 }
 
-void ParticleSystem::printC44()
-{
+void ParticleSystem::printC44(){
     setC44();
-    cerr << "C44 = " << C44 << endl;
+    cout << "C44 = " << C44 << endl;
 }
 
-void ParticleSystem::setB()
-{
-   // set_r0();
+void ParticleSystem::setB(){
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(0, 0.0): cohesiveEnergy(0, 0.0)) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(0, -0.01): cohesiveEnergy(0, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(0, 0.01): cohesiveEnergy(0, 0.01)) * particles.size();
-    //cerr << energy_i0 << "\t" << energy_i1 << "\t" << energy_i2 << "\t" << V0 << endl;
     B = 2.0 / (9.0 * V0) * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
 }
 
@@ -608,13 +690,10 @@ void ParticleSystem::setB()
 void ParticleSystem::setEsol()
 {
     double cohEnergy_b = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy());
-    //cerr << "coh b = " << cohEnergy_b << "\n";
-    double cohEnergy_a = -4.435;
     double energy_b = cohEnergy_b * particles.size();
     particles[0].setType(1);
     double energy_ab = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy()) * particles.size();
-   // cerr << "ener " << cohesiveEnergy() << "\n";
-    Esol = energy_ab - energy_b - cohEnergy_a + cohEnergy_b;
+    Esol = energy_ab - energy_b - cohEnergyPurityAtom + cohEnergy_b;
     particles[0].setType(0);
 }
 
@@ -630,7 +709,6 @@ bool ParticleSystem::stop_rule(vector<vector<double>> & simplex, vector<double> 
             return false;
         }
     }
-   // cerr << "stop rule\n";
     return true;
 }
 
@@ -641,13 +719,12 @@ int ParticleSystem::type(int i, int j)
 
 void ParticleSystem::fittingB()
 {
-    cerr << "\n\nValues by fitted params for BB type interconection of elements\n";
+    if (printConfigurationFlag) cout << "\n";
+    cout << "Values by fitted params for " + nameAtom + "-" + nameAtom + " type interconection of elements\n";
     NMA(&ParticleSystem::error_b, 0);
-    cerr << "lattice constant = " << latticeConstant << "\n";
+    cout << "lattice constant = " << latticeConstant << "\n";
     cohEnergy = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy());
-    cerr <<  "Cohesive energy: " << cohEnergy << endl;
-    //printV0();
-    setV0();
+    cout <<  "Cohesive energy: " << cohEnergy << endl;
     printB();
     printC11_C12();
     printC44();
@@ -655,138 +732,58 @@ void ParticleSystem::fittingB()
 
 void ParticleSystem::fittingAB()
 {
-    cerr << "\n\nValues by fitted params for AB type interconection of elements\n";
-   // particles[53].setType(1);
+    cout << "\n\nValues by fitted params for " + namePurityAtom + "-" + nameAtom + " type interconection of elements\n";
     NMA(&ParticleSystem::error_ab, 1);
-    //setEsol();
-    cerr << "Esol = " << Esol << "\n";
-   // particles[53].setType(0);
+    cout << "Esol = " << Esol << "\n";
 }
 
 void ParticleSystem::fittingA()
 {
-    cerr << "\n\nValues by fitted params for AA type interconection of elements\n";
+    cout << "\n\nValues by fitted params for " + namePurityAtom + "-" + namePurityAtom + " type interconection of elements\n";
     NMA(&ParticleSystem::error_a, 2);
-    cerr << "Energy dim in = " << energyIn << "\n";
-    cerr << "Energy dim out = " << energyOn << "\n";
-}
-
-
-void ParticleSystem::print_table_params()
-{
-    cerr << "Values by table params\n";
-    setTableParams(0);
-    cohEnergy = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy());
-    print_params(0);
-    cerr << "lattice constant = " << latticeConstant  << "\n";
-    cerr << "Cohesive energy: " << cohEnergy << endl;
-    //printV0();
-    setV0();
-    printB();
-    printC11_C12();
-    printC44();
+    cout << "Energy dim in = " << energyIn << "\n";
+    cout << "Energy dim out = " << energyOn << "\n";
 }
 
 void ParticleSystem::printEsol()
 {
     setEsol();
-    cerr << "Esol = " << Esol << endl;
+    cout << "Esol = " << Esol << endl;
 }
 
 void ParticleSystem::printB()
 {
     setB();
-    cerr << "B = " << B << endl;
+    cout << "B = " << B << endl;
 }
 
-double ParticleSystem::setTableParams(int type)
-{
-     A1[type] = 0.0; A0[type] = 0.1028; ksi[type] = 1.178; p[type] = 10.928; q[type] = 3.139; latticeConstant = 4.085; r0[type] = latticeConstant / sqrt(2); // Ag
-}
 
 
 void ParticleSystem::generate_params(int _type, vector<double> & params)
 {
     if (_type == 0){
-        params[0] = random() / (double)RAND_MAX * 0.1028 * 2.0 / 3.0 + 0.1028 * 2.0 / 3.0;
-        params[1] = random() / (double)RAND_MAX * 0.2 - 0.1;
-        params[2] = random() / (double)RAND_MAX * 1.178 * 2.0 / 3.0 + 1.178 * 2.0 / 3.0;
-        params[3] = random() / (double)RAND_MAX * 10.928 * 2.0 / 3.0 + 10.928 * 2.0 / 3.0;
-        params[4] = random() / (double)RAND_MAX * 3.139 * 2.0 / 3.0 + 3.139 * 2.0 / 3.0;
-        params[5] = random() / (double)RAND_MAX * 2.88853 * 2.0 / 3.0 + 2.88853 * 2.0 / 3.0;
+        params[0] = random() / (double)RAND_MAX * (bb_a0[1] - bb_a0[0]) + bb_a0[0];
+        params[1] = random() / (double)RAND_MAX * (bb_a1[1] - bb_a1[0]) + bb_a1[0];
+        params[2] = random() / (double)RAND_MAX * (bb_ksi[1] - bb_ksi[0]) + bb_ksi[0];
+        params[3] = random() / (double)RAND_MAX * (bb_p[1] - bb_p[0]) + bb_p[0];
+        params[4] = random() / (double)RAND_MAX * (bb_q[1] - bb_q[0]) + bb_q[0];
+        params[5] = random() / (double)RAND_MAX * (bb_r0[1] - bb_r0[0]) + bb_r0[0];
     }
     else if (_type == 1){
-        params[0] = random() / (double)RAND_MAX * 0.1028 * 2.0 / 3.0 + 0.1028 * 2.0 / 3.0;
-        params[1] =random() / (double)RAND_MAX * 0.2 - 0.1;
-        params[2] = random() / (double)RAND_MAX * 1.178 * 2.0 / 3.0 + 1.178 * 2.0 / 3.0;
-        params[3] = random() / (double)RAND_MAX * 10.928 * 2.0 / 3.0 + 10.928 * 2.0 / 3.0;
-        params[4] = random() / (double)RAND_MAX * 3.139 * 2.0 / 3.0 + 3.139 * 2.0 / 3.0;
-        params[5] = random() / (double)RAND_MAX * 2.88853 * 2.0 / 3.0 + 2.88853 * 2.0 / 3.0;
-
+        params[0] = random() / (double)RAND_MAX * (ab_a0[1] - ab_a0[0]) + ab_a0[0];
+        params[1] = random() / (double)RAND_MAX * (ab_a1[1] - ab_a1[0]) + ab_a1[0];
+        params[2] = random() / (double)RAND_MAX * (ab_ksi[1] - ab_ksi[0]) + ab_ksi[0];
+        params[3] = random() / (double)RAND_MAX * (ab_p[1] - ab_p[0]) + ab_p[0];
+        params[4] = random() / (double)RAND_MAX * (ab_q[1] - ab_q[0]) + ab_q[0];
+        params[5] = random() / (double)RAND_MAX * (ab_r0[1] - ab_r0[0]) + ab_r0[0];
     }
     else{
-        params[0] = random() / (double)RAND_MAX * 2 - 1;
-        params[1] = random() / (double)RAND_MAX * 2 - 1;
-        params[2] = random() / (double)RAND_MAX * 2 - 1;
-        params[3] = random() / (double)RAND_MAX * 20 - 10;
-        params[4] = random() / (double)RAND_MAX * 2 - 1;
-        params[5] = random() / (double)RAND_MAX * 5 - 2.5;
-
-        params[0] = random() / (double)RAND_MAX * 1.06684 * 2.0 / 3.0 + 1.06684 * 2.0 / 3.0;
-        params[1] = random() / (double)RAND_MAX * -0.897184 * 2.0 / 3.0 + -0.897184 * 2.0 / 3.0;
-        params[2] = random() / (double)RAND_MAX * -1.8706 * 2.0 / 3.0 + -1.8706 * 2.0 / 3.0;
-        params[3] = random() / (double)RAND_MAX * 1.63617 * 2.0 / 3.0 + 1.63617 * 2.0 / 3.0;
-        params[4] = random() / (double)RAND_MAX * -0.0985134 * 2.0 / 3.0 + -0.0985134 * 2.0 / 3.0;
-        params[5] = random() / (double)RAND_MAX * 2.89092 * 2.0 / 3.0 + 2.89092 * 2.0 / 3.0;
-
+        params[0] = random() / (double)RAND_MAX * (aa_a0[1] - aa_a0[0]) + aa_a0[0];
+        params[1] = random() / (double)RAND_MAX * (aa_a1[1] - aa_a1[0]) + aa_a1[0];
+        params[2] = random() / (double)RAND_MAX * (aa_ksi[1] - aa_ksi[0]) + aa_ksi[0];
+        params[3] = random() / (double)RAND_MAX * (aa_p[1] - aa_p[0]) + aa_p[0];
+        params[4] = random() / (double)RAND_MAX * (aa_q[1] - aa_q[0]) + aa_q[0];
+        params[5] = random() / (double)RAND_MAX * (aa_r0[1] - aa_r0[0]) + aa_r0[0];
     }
 }
 
-
-void ParticleSystem::checkInOn()
-{
-   // A1[0] = 0.0; A0[0] = 0.1028; ksi[0] = 1.178; p[0] = 10.928; q[0] = 3.139; latticeConstant = 4.085; r0[0] = latticeConstant / sqrt(2); // Ag
-    A0[0] = 0.0854;
-    A1[0] = 0.0;
-    ksi[0] = 1.2243;
-    p[0] = 10.939;
-    q[0] = 2.2799;
-    r0[0] = 2.5563;
-    latticeConstant = 3.615;
-    A0[1] = -0.0487;
-    A1[1] = -0.7922;
-    ksi[1] = 0.7356;
-    p[1] = 8.1825;
-    q[1] = 3.344;
-    r0[1] = 2.4049;
-    A0[2] = 0.1385;
-    A1[2] = -0.3583;
-    ksi[2] = 1.5247;
-    p[2] = 7.6788;
-    q[2] = 2.139;
-    r0[2] = 2.3780;
-    cohEnergy = (OMP_ON ? cohesiveEnergy_omp(): cohesiveEnergy());
-    setV0();
-    setC11_C12();
-    setB();
-    setC44();
-    setEsol();
-    setEnergyIn();
-    setEnergyOn();
-    cerr << "A0: " <<  A0[0] << " " << A0[1] << " " << A0[2] << "\n";
-    cerr << "A1: " <<  A1[0] << " " << A1[1] << " " << A1[2] << "\n";
-    cerr << "xi: " <<  ksi[0] << " " << ksi[1] << " " << ksi[2] << "\n";
-    cerr << "p: " <<  p[0] << " " << p[1] << " " << p[2] << "\n";
-    cerr << "q: " <<  q[0] << " " << q[1] << " " << q[2] << "\n";
-    cerr << "r0: " <<  r0[0] << " " << r0[1] << " " << r0[2] << "\n";
-    cerr << "a: " << latticeConstant << "\n";
-    cerr << "coh = " << cohEnergy << "\n";
-    cerr << "B = " << B << "\n";
-    cerr << "C11 = " << C11 << "\n";
-    cerr << "C12 = " << C12 << "\n";
-    cerr << "C44  = " << C44 << "\n";
-    cerr << "Esol = " << Esol << "\n";
-    cerr << "energy in " << energyIn << "\n";
-    cerr << "energy on " << energyOn << "\n";
-
-}
