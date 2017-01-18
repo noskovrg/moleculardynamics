@@ -645,15 +645,15 @@ void ParticleSystem::setC11_C12()
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(11, 0.0): cohesiveEnergy()) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(11, -0.01): cohesiveEnergy(11, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(11, 0.01): cohesiveEnergy(11, 0.01)) * particles.size();
-    C11 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
-    C12 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
+    C11 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001;
+    C12 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 ;
     }
     {
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(12, 0.0): cohesiveEnergy(12, 0.0)) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(12, -0.01): cohesiveEnergy(12, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(12, 0.01): cohesiveEnergy(12, 0.01)) * particles.size();
-    C11 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
-    C12 -= 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
+    C11 += 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001;
+    C12 -= 1. / V0 * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001;
     }
     C11 /= 2;
     C12 /= 2;
@@ -671,7 +671,7 @@ void ParticleSystem::setC44(){
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(44, 0.0): cohesiveEnergy(44, 0.0)) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(44, -0.01): cohesiveEnergy(44, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(44, 0.01): cohesiveEnergy(44, 0.01)) * particles.size();
-    C44 = 1.0 / (2.0 * V0) * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
+    C44 = 1.0 / (2.0 * V0) * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001;
 }
 
 void ParticleSystem::printC44(){
@@ -683,7 +683,7 @@ void ParticleSystem::setB(){
     double energy_i1 = (OMP_ON ? cohesiveEnergy_omp(0, 0.0): cohesiveEnergy(0, 0.0)) * particles.size();
     double energy_i0 = (OMP_ON ? cohesiveEnergy_omp(0, -0.01): cohesiveEnergy(0, -0.01)) * particles.size();
     double energy_i2 = (OMP_ON ? cohesiveEnergy_omp(0, 0.01): cohesiveEnergy(0, 0.01)) * particles.size();
-    B = 2.0 / (9.0 * V0) * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001 * 0.8018993929636421;
+    B = 2.0 / (9.0 * V0) * (energy_i0 - 2 * energy_i1 + energy_i2) / 0.0001;
 }
 
 
